@@ -1,8 +1,8 @@
-# Atlas Product Reconstruction Specification
+# Specta Product Reconstruction Specification
 
 ## 1. Objective
 
-Build **Atlas**, a single-page, Notion-inspired knowledge workspace that combines:
+Build **Specta**, a single-page, Notion-inspired knowledge workspace that combines:
 
 1. A collapsible document library on the left.
 2. A distraction-free rich-text document editor in the center.
@@ -10,7 +10,7 @@ Build **Atlas**, a single-page, Notion-inspired knowledge workspace that combine
 
 The product should feel calm, editorial, and highly focused. It is a working front-end prototype: documents and chats are stored locally in the browser, while the agent response is simulated and intentionally ready to be replaced by a real backend.
 
-The finished page title is **“Atlas — Think, write, and work together”** and the product description is **“A focused knowledge workspace for documents and AI conversations.”**
+The finished page title is **“Specta — Think, write, and work together”** and the product description is **“A focused knowledge workspace for documents and AI conversations.”**
 
 ## 2. Required Technology
 
@@ -23,7 +23,8 @@ Use the following stack:
 - Tiptap 3 for the rich-text editor
 - Lucide React for interface icons
 - Plain global CSS, optionally loaded through Tailwind CSS using `@import "tailwindcss"`
-- Browser `localStorage` for prototype persistence
+- Browser `localStorage` for prototype persistence of documents and chats
+- During local `vinext dev`, saving the `spec` document also writes `spec/spec.md` on disk
 
 Do not use an external database, authentication system, or live AI API in this version.
 
@@ -43,7 +44,7 @@ Fill the entire viewport with a three-column CSS grid:
 
 ```text
 ┌──────────────────────┬────────────────────────────────┬────────────────────────────┐
-│ Document library     │ Document editor                │ Atlas agent                │
+│ Document library     │ Document editor                │ Specta agent                │
 │ Light warm gray      │ Warm ivory paper              │ Dark charcoal              │
 │ 262 px expanded      │ Flexible, minimum 470 px       │ 360 px                     │
 │ 64 px collapsed      │                                │                            │
@@ -149,7 +150,7 @@ The document library is sourced from files in the `spec/` folder. Do not seed fi
 On first load, or whenever stored documents are missing or unusable, seed the editor with `spec/spec.md`:
 
 - ID derived from the filename (`spec`)
-- Title from the file’s first H1 (`Atlas Product Reconstruction Specification`), or `spec` if none
+- Title from the file’s first H1 (`Specta Product Reconstruction Specification`), or `spec` if none
 - Updated label: `Just now`
 - Content is the markdown of `spec/spec.md` converted to Tiptap HTML
 
@@ -178,8 +179,8 @@ The left side is always the document library.
 
 ### 8.1 Header
 
-- Show a 27 px square orange brand mark containing the serif letter `A`.
-- Show the word `Atlas` when expanded.
+- Show a 27 px square orange brand mark containing the serif letter `S`.
+- Show the word `Specta` when expanded.
 - Place a collapse/expand button at the far right.
 - Use `ChevronLeft` while expanded and `ChevronRight` while collapsed.
 - The button must update a real `leftCollapsed` state.
@@ -283,7 +284,7 @@ The right side must be a dedicated conversation/agent window. Do not use it as a
 
 - Dark charcoal background.
 - Circular agent mark using the `Sparkles` icon in orange.
-- Label: `Atlas agent`.
+- Label: `Specta agent`.
 - Subtitle: `Uses this document`.
 - A plus button on the right starts a new chat and has accessible text/title `New chat` or `Start a new chat`.
 
@@ -317,7 +318,7 @@ The shortcut fills the input but does not automatically submit it.
 - Placeholder: `Ask about this document…`.
 - Enter submits.
 - Shift+Enter creates a newline.
-- Show `Atlas can make mistakes` in the lower-left.
+- Show `Specta can make mistakes` in the lower-left.
 - Show a small orange send button in the lower-right.
 - Disable the send button when the trimmed input is empty.
 
@@ -351,8 +352,8 @@ Create a new record that:
 Use these local-storage keys:
 
 ```text
-atlas-documents
-atlas-chats
+specta-documents
+specta-chats
 ```
 
 Hydration behavior:
@@ -368,6 +369,14 @@ Persistence behavior:
 - Save the full chat array whenever it changes after hydration.
 - After a document change, show `Saving…`, then switch to `Saved` after approximately 650 ms.
 - Cancel the previous save-indicator timeout when another document update occurs.
+
+Local `spec.md` write-back (development only):
+
+- After that same save debounce, if the changed document id is `spec`, `POST /api/spec` with `{ title, content }`.
+- Convert the document’s Tiptap HTML back to markdown, keep the title as the first H1, and write `spec/spec.md`.
+- Handle the write on the Vite dev host, not inside the Cloudflare worker. The worker filesystem is not the project directory.
+- Untitled documents and any other library items stay in `localStorage` only.
+- This write-back is a local-dev convenience. It is not hosted multi-user storage.
 
 The selected document, selected chat, search text, composer draft, and collapsed state do not need to persist across reloads.
 
@@ -386,9 +395,9 @@ The remake must include:
 
 Use this metadata:
 
-- Title: `Atlas — Think, write, and work together`
+- Title: `Specta — Think, write, and work together`
 - Description: `A focused knowledge workspace for documents and AI conversations.`
-- Open Graph title: `Atlas`
+- Open Graph title: `Specta`
 - Open Graph description: `Think, write, and work together.`
 - X/Twitter card type: `summary_large_image`
 
@@ -396,7 +405,7 @@ The project’s `public/og.png` is a landscape editorial social card at approxim
 
 - Warm ivory paper background.
 - A charcoal vertical strip on the left.
-- Large serif `Atlas` wordmark.
+- Large serif `Specta` wordmark.
 - Tagline `Think, write, and work together.`.
 - Layered document and chat motifs on the right.
 - Burnt-orange accent blocks.
@@ -408,7 +417,7 @@ If recreating the asset rather than reusing it, preserve the exact displayed tex
 Do not accidentally imply that the following are implemented:
 
 - A real LLM or agent backend.
-- Server-side document storage.
+- Hosted or multi-user document storage, an external database, or cloud file sync.
 - Multi-user collaboration.
 - Authentication or workspace membership.
 - Sharing permissions.
@@ -416,12 +425,13 @@ Do not accidentally imply that the following are implemented:
 - Streaming responses.
 - Attachments or file uploads.
 
-The current app is intentionally a polished, locally persistent front-end prototype.
+The current app is a polished front-end prototype. Documents and chats persist in `localStorage`. During local development, saving the `spec` document also updates `spec/spec.md` on disk.
 
 ## 15. Build and Runtime Requirements
 
 Required package scripts should provide development, production build, and start commands through Vinext. The project must retain a Vite configuration using:
 
+- `specWrite()` so `POST /api/spec` writes `spec/spec.md` from the Vite host during `vinext dev`
 - `vinext()`
 - the Sites Vite plugin
 - the Cloudflare Vite plugin
