@@ -1,0 +1,9 @@
+# Ignore everything in this repository by default.
+*
+
+# Keep this policy file trackable so the allowlist can be enforced.
+!/.gitignore
+
+# The sole allowed content file.
+!/spec/
+!/spec/spec.md
