@@ -4,9 +4,10 @@
 # Keep this policy file trackable so the allowlist can be enforced.
 !/.gitignore
 
-# The sole allowed content file.
+# Allow Markdown specifications anywhere under spec/.
 !/spec/
-!/spec/spec.md
+!/spec/**/
+!/spec/**/*.md
 
 # Project skills (Codex + Grok). Claude Code is not mirrored for now.
 !/.agents/
