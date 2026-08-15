@@ -4,7 +4,7 @@
 
 Build **Specta**, a single-page, Notion-inspired knowledge workspace that combines:
 
-1. A collapsible document library on the left.
+1. A collapsible document library on the left, with a read-only variants view of files in `variants/`.
 2. A distraction-free rich-text document editor in the center.
 3. Selection-based comments on the document, shown in a panel that opens beside the editor.
 4. A local-dev review mode that diffs `spec/` against git and can commit that folder.
@@ -31,6 +31,7 @@ Use the following stack:
     - `GET /api/spec-sources` — list current `spec/` files and their markdown
     - `GET /api/spec-review` — diff `spec/` against git
     - `POST /api/spec-commit` — commit the `spec/` folder
+    - `GET /api/variant-sources` — list current `variants/` markdown files (recursive, including subdirectories) and their markdown
 
 Do not use an external database, authentication system, or live AI API in this version.
 
@@ -42,7 +43,7 @@ Implement the experience as one client-rendered page.
 
 `app/layout.tsx` should provide page metadata, Open Graph metadata, X/Twitter card metadata, and the shared global stylesheet. Build the absolute `og.png` URL from the incoming request host and forwarded protocol.
 
-Icon-only and unlabeled controls need accurate `aria-label`s that match their visible purpose (`Documents`, `Document title`, `Document content`, filenames, overflow menus, the library resize handle, comments, and review actions). Collapsed document buttons also expose the title with the native `title` attribute.
+Icon-only and unlabeled controls need accurate `aria-label`s that match their visible purpose (`Documents`, `Variants`, `Document title`, `Document content`, filenames, overflow menus, the library resize handle, comments, and review actions). Collapsed document buttons also expose the title with the native `title` attribute.
 
 ## 4. Product Layout
 
@@ -154,6 +155,22 @@ Seed comments from comment sidecar files in `spec/`. `spec.comments.md` is the s
 
 The prototype author name is `Kosta`.
 
+### 7.3 Variants
+
+The variants view is sourced from markdown files in the `variants/` folder, including subdirectories. Do not list those files as library documents. Do not seed comments from them.
+
+On first load, or whenever stored variants are missing, read the bundled `variants/` sources. If other `.md`, `.mdx`, or `.txt` files are present under `variants/` (any depth), list them as well.
+
+Each variant record:
+
+- ID is `variant:{relative-path}` (`variant:svelte.md`)
+- Filename is the path relative to `variants/` (`svelte.md`)
+- Title from the file’s first H1, or the file stem if none
+- Updated label: `Just now`
+- Content is the markdown converted to Tiptap HTML
+
+When a new allowed file appears under `variants/`, add it to the variants list without requiring a full reload. Variants are not written to `localStorage`.
+
 ## 8. Left Document Sidebar
 
 The left side is always the document library.
@@ -177,6 +194,7 @@ Show:
 - Small plus icon for document creation.
 - Search field with a search icon and placeholder `Search documents`.
 - Full-width orange `New document` button.
+- A `Variants` button above the `All documents` section.
 - Small `All documents` section label with a chevron.
 - Scrollable document list.
 - Profile row at the bottom with initials `KL`, name `Kosta`, and subtitle `Personal workspace`.
@@ -213,6 +231,24 @@ Choosing `Delete` from the overflow menu:
 - If it was the active document, select `spec` if it is still present, otherwise the first remaining document.
 - If the library would be empty, create one blank Untitled document and select it.
 
+### 8.6 Variants view
+
+Above the `All documents` section label, show a `Variants` button (`aria-label="Variants"`). Choosing it replaces the document list with a read-only list of files from `variants/`. A `Documents` button in the same place (`aria-label="Documents"`) returns to the document library.
+
+While the variants view is open:
+
+- Change the library heading to `Variants`.
+- Hide the plus control and the `New document` button.
+- Change the search placeholder to `Search variants`.
+- Change the section label to `All variants`.
+- List every variant. Filter titles and relative paths case-insensitively from the search input.
+- Each item uses the same tile treatment as documents. Show the title and the relative path under it. The path is not editable. There is no overflow menu and no delete action.
+- Clicking a row opens that variant in the center editor as read-only.
+- If the list is empty, show an empty list. The editor shows: `No variant files in variants/.`
+- When collapsed or at compact widths, show a `Variants` icon button at the top of the rail to enter the view, and a `Documents` icon button to leave it. Variant items are icon-only like documents.
+- Leaving variants restores the document that was active before the view was opened.
+- Entering variants closes comments, cancels a draft, and exits review. Select the first variant, or keep the last selected variant if it is still present.
+
 ## 9. Center Document Editor
 
 ### 9.1 Canvas
@@ -224,8 +260,8 @@ Choosing `Delete` from the overflow menu:
 
 At the top of the canvas, show one small inline metadata row, not a bar:
 
-- Left: file icon plus `Working document` in orange (or `Reviewing spec` while review is open), then a `Review` button (or `Commit` and `Cancel` while reviewing), then `Saving…` while edits are settling, then a green check and `Saved`.
-- Right: a comments toggle. Hide this control while review is open.
+- Left: file icon plus `Working document` in orange (or `Reviewing spec` while review is open, or `Variant` while a variant is open), then a `Review` button (or `Commit` and `Cancel` while reviewing), then `Saving…` while edits are settling, then a green check and `Saved`. Hide Review and the save indicator while a variant is open.
+- Right: a comments toggle. Hide this control while review is open or a variant is open.
 
 The comments toggle uses a message-square icon. If the active document has no threads, its label is `Comments`. If it has threads, show the count instead of the word. The control is pressed while the comments panel is open. Closing the panel while a draft is open cancels that draft.
 
@@ -323,6 +359,16 @@ Other changed library files appear below as a compact `Other changes` list, each
 - Otherwise creates a commit with message `Update spec`.
 
 On a successful response, reload spec-sourced documents from the current `spec/` files (keep user-created documents that are not in `spec/`), then exit review. Failures stay in review and show the error.
+
+### 9.6 Variant editor
+
+While a variant is open:
+
+- Change the metadata label to `Variant`.
+- Make the title and editor read-only. Hide the bubble menu, comments toggle, comments panel, Review, and the save indicator.
+- Do not treat comment marks as clickable.
+- Do not `POST /api/spec`.
+- If the user clicks a link whose last path segment looks like `{stem}.md`, `{stem}.mdx`, or `{stem}.txt`, and a variant with that relative path or stem exists, open that variant.
 
 ## 10. Comments
 
@@ -447,6 +493,7 @@ Local `spec.md` write-back (development only):
 - Renaming the `spec` document’s displayed filename does not change the write path. Disk write-back is keyed by document id `spec` and always targets `spec/spec.md` and `spec/spec.comments.md`.
 - Do not POST while a comment draft is open or while review is open. Wait until the draft is submitted or cancelled so an in-progress mark is not flushed. Flush a pending write before entering review.
 - `GET /api/spec-sources` is the live listing used to pick up new `spec/` files without a full reload and to refresh spec-sourced documents after a commit.
+- `GET /api/variant-sources` is the live listing used to pick up new `variants/` files without a full reload. Variants are never written to `localStorage` and never written back to disk from the editor.
 - Review and commit run only on the Vite dev host, like `POST /api/spec`.
 - This write-back is a local-dev convenience. It is not hosted multi-user storage.
 
@@ -482,7 +529,8 @@ Do not accidentally imply that the following are implemented:
 - Multi-user collaboration or live presence. Comments are local to this browser, authored as `Kosta`.
 - Authentication or workspace membership.
 - Sharing permissions.
-- Folder hierarchy.
+- Folder hierarchy in the document library. Variant files may live in subdirectories of `variants/`; they still appear as a flat list of relative paths.
+- Editing variant files from the app. The variants view is read-only.
 - Renaming the document title from the sidebar. The sidebar edits the filename only; the title is edited in the document canvas.
 - Streaming responses.
 - Attachments or file uploads.
@@ -493,7 +541,7 @@ The current app is a polished front-end prototype. Documents and comments persis
 
 Required package scripts should provide development, production build, and start commands through Vinext. The project must retain a Vite configuration using:
 
-- `specWrite()` so the Vite host during `vinext dev` can write `spec/spec.md` and `spec/spec.comments.md` (`POST /api/spec`), list `spec/` (`GET /api/spec-sources`), diff `spec/` against git (`GET /api/spec-review`), and commit `spec/` (`POST /api/spec-commit`)
+- `specWrite()` so the Vite host during `vinext dev` can write `spec/spec.md` and `spec/spec.comments.md` (`POST /api/spec`), list `spec/` (`GET /api/spec-sources`), list `variants/` (`GET /api/variant-sources`), diff `spec/` against git (`GET /api/spec-review`), and commit `spec/` (`POST /api/spec-commit`)
 - `vinext()`
 - the Sites Vite plugin
 - the Cloudflare Vite plugin

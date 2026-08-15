@@ -9,6 +9,11 @@
 !/spec/**/
 !/spec/**/*.md
 
+# Allow Markdown variants anywhere under variants/.
+!/variants/
+!/variants/**/
+!/variants/**/*.md
+
 # Project skills (Codex + Grok). Claude Code is not mirrored for now.
 !/.agents/
 !/.agents/skills/
