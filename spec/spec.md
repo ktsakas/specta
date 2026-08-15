@@ -21,11 +21,6 @@ Use the following stack:
 - Next.js 16 App Router
 - Vinext and Vite for the runtime/build pipeline
 - Tiptap 3 for the rich-text editor
-- `@tiptap/react`
-- `@tiptap/react/menus`
-- `@tiptap/starter-kit`
-- `@tiptap/extension-placeholder`
-- `@tiptap/pm`
 - Lucide React for interface icons
 - Plain global CSS, optionally loaded through Tailwind CSS using `@import "tailwindcss"`
 - Browser `localStorage` for prototype persistence
@@ -37,21 +32,6 @@ The Node.js engine must support version 22.13 or newer.
 ## 3. App Structure
 
 Implement the experience as one client-rendered page.
-
-Recommended files:
-
-```text
-app/
-  layout.tsx
-  page.tsx
-  globals.css
-public/
-  og.png
-.openai/
-  hosting.json
-```
-
-`app/page.tsx` should begin with `"use client"` because it owns editor state, local persistence, and user interaction.
 
 `app/layout.tsx` should provide page metadata, Open Graph metadata, X/Twitter card metadata, and the shared global stylesheet. Build the absolute `og.png` URL from the incoming request host and forwarded protocol.
 
@@ -156,28 +136,7 @@ Additional important colors:
 
 ## 6. Data Model
 
-Use these TypeScript structures:
-
-```ts
-type DocumentRecord = {
-  id: string;
-  title: string;
-  content: string;   // Tiptap HTML
-  updatedAt: string; // Human-readable prototype label
-};
-
-type ChatMessage = {
-  id: string;
-  role: "assistant" | "user";
-  text: string;
-};
-
-type ChatRecord = {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-};
-```
+Documents have an id, title, Tiptap HTML content, and a human-readable updated label. Chats have an id, title, and a list of user or assistant messages.
 
 Generate new IDs from a prefix, current timestamp, and short random base-36 suffix.
 
@@ -185,39 +144,16 @@ Generate new IDs from a prefix, current timestamp, and short random base-36 suff
 
 ### 7.1 Documents
 
-Seed three documents.
+The document library is sourced from files in the `spec/` folder. Do not seed fictional stand-ins such as Product brief, Research notes, or Weekly plan.
 
-#### Product brief
+On first load, or whenever stored documents are missing or unusable, seed the editor with `spec/spec.md`:
 
-- ID: `product-brief`
-- Title: `Product brief`
+- ID derived from the filename (`spec`)
+- Title from the file’s first H1 (`Atlas Product Reconstruction Specification`), or `spec` if none
 - Updated label: `Just now`
-- Content should include:
-  - Date: `August 8, 2026`
-  - H1: `Rethinking the knowledge workspace`
-  - Introductory paragraph about building a calmer place for teams to think, write, and move work forward with an AI collaborator.
-  - H2: `The opportunity`
-  - Paragraph explaining that knowledge work is scattered across documents, chats, and disconnected tools.
-  - Block quote: `What if every conversation could become a useful artifact—and every document could start a thoughtful conversation?`
-  - H2: `Principles`
-  - Bulleted list with bold leads:
-    - `Keep the canvas quiet.`
-    - `Make context portable.`
-    - `Build for momentum.`
+- Content is the markdown of `spec/spec.md` converted to Tiptap HTML
 
-#### Research notes
-
-- ID: `research-notes`
-- Title: `Research notes`
-- Updated label: `Yesterday`
-- Include an H1 and a short instruction to capture useful signals, open questions, and patterns.
-
-#### Weekly plan
-
-- ID: `weekly-plan`
-- Title: `Weekly plan`
-- Updated label: `Aug 6`
-- Include an H1, an H2 called `Priorities`, and bullets for refining the editor experience and reviewing early feedback.
+If other `.md`, `.mdx`, or `.txt` files are present in `spec/`, list them as additional documents. `spec.md` is the default active document.
 
 ### 7.2 Chat sessions
 
@@ -301,20 +237,7 @@ Below it, show a borderless title input. The title must update the active docume
 
 ### 9.2 Tiptap setup
 
-Configure Tiptap with:
-
-```ts
-useEditor({
-  immediatelyRender: false,
-  extensions: [
-    StarterKit,
-    Placeholder.configure({ placeholder: "Start writing…" }),
-  ],
-  content: initialDocumentHtml,
-});
-```
-
-Set the editable element class to `tiptap-editor` and give it `aria-label="Document content"`.
+Use the placeholder `Start writing…`. Set the editable element class to `tiptap-editor` and give it `aria-label="Document content"`.
 
 On each editor update:
 
@@ -348,12 +271,9 @@ Use corresponding Lucide icons and reflect each command’s active state.
 
 ### 9.4 Editor typography
 
-- Body: Georgia, 17 px, 1.72 line height.
 - H1: approximately 31 px.
 - H2: approximately 23 px.
-- Add comfortable vertical spacing between blocks.
 - Block quotes use a 3 px orange left border, italic text, and slightly larger type.
-- Empty editor placeholder is muted and implemented through Tiptap’s `data-placeholder` attribute.
 
 ## 10. Right Agent Chat
 
@@ -428,18 +348,6 @@ Create a new record that:
 
 ## 11. Client State and Persistence
 
-Maintain these state values:
-
-- `documents`
-- `activeDocumentId`
-- `chats`
-- `activeChatId`
-- `search`
-- `chatInput`
-- `saved`
-- `ready`
-- `leftCollapsed`
-
 Use these local-storage keys:
 
 ```text
@@ -467,16 +375,12 @@ The selected document, selected chat, search text, composer draft, and collapsed
 
 The remake must include:
 
-- Meaningful `aria-label` values for icon-only buttons.
 - `aria-label="Documents"` for document navigation.
 - `aria-label="Document title"` for the title input.
 - `aria-label="Document content"` on the Tiptap editable surface.
 - `aria-label="Current chat session"` for session selection.
 - `aria-live="polite"` on the message list.
-- Native button, input, textarea, select, and navigation elements.
 - A native tooltip through `title` for collapsed document buttons.
-- Visible hover/focus affordances with adequate contrast.
-- Disabled styling for an empty send action.
 
 ## 13. Metadata and Social Preview
 
@@ -526,44 +430,3 @@ Required package scripts should provide development, production build, and start
 No D1 or R2 resources are required for this prototype; both bindings may remain `null` in `.openai/hosting.json`.
 
 The final production build must succeed without TypeScript or bundling errors.
-
-## 16. Recommended Implementation Order
-
-1. Create the Next/Vinext project and install Tiptap plus Lucide.
-2. Define document and chat data models and seed data.
-3. Build the three-column desktop shell.
-4. Implement the collapsible document sidebar and document selection/search/creation.
-5. Configure Tiptap and document switching.
-6. Add the selection-only bubble formatting menu.
-7. Implement save state and local-storage hydration/persistence.
-8. Build the right-side agent header, session selector, message history, prompt shortcuts, and composer.
-9. Add new-chat and simulated-send behavior.
-10. Apply the exact visual tokens and responsive breakpoints.
-11. Add metadata and the social image.
-12. Verify all acceptance criteria below.
-
-## 17. Acceptance Criteria
-
-The product is successfully reconstructed when all of these are true:
-
-- The first viewport clearly shows documents on the left, an editor in the center, and a chat agent on the right.
-- The left collapse button visibly changes the document rail between expanded and compact widths and can reverse the action.
-- Creating a document adds it to the top, activates it, and allows immediate title/body editing.
-- Searching filters documents by title without altering stored data.
-- Switching documents preserves each document’s separate title and HTML content.
-- Editing causes a visible `Saving…` to `Saved` transition.
-- Reloading restores documents and chats from local storage.
-- No permanent formatting bar is visible.
-- Selecting text opens the Tiptap bubble menu, and every formatting action works.
-- The right panel contains chat controls only, not document controls.
-- A user can create a new chat and switch among chat sessions.
-- Enter sends a message, Shift+Enter inserts a newline, and blank messages cannot be sent.
-- New chats are renamed from the first submitted prompt.
-- Chat and document state remain separate.
-- Desktop, compact, and mobile layouts match the behavior described above.
-- All icon-only controls have accessible labels.
-- The production build completes successfully.
-
-## 18. Final Product Character
-
-The remake should not look like a generic admin dashboard. Atlas is an editorial writing environment with a quiet center canvas, a practical document rail, and a clearly separate dark agent surface. The writing is visually primary. Navigation is compact. Controls appear close to the action that needs them, especially the text-selection formatting menu. The design should feel closer to a thoughtful modern notebook than a conventional productivity dashboard.
