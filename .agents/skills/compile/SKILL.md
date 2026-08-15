@@ -18,8 +18,13 @@ description: >
 3. If `spec/` is missing or empty, stop and say so.
 4. Implement the specified program in this repository. Follow the spec as written: stack, structure, behavior, layout, and constraints. Do not add features the spec does not ask for. Do not skip requirements it does ask for. Do not edit files under `spec/`.
 5. Keep going until the implementation matches the spec, including installing dependencies and leaving the project in a runnable state.
+6. Audit the **running** product, not only source. Start it and exercise every specified behavior with real seed or default data, including empty and error paths.
+   - A requirement is not met if it exists only in code, markup, or state. The user-facing result has to match the spec.
+   - If output is missing or wrong despite correct-looking implementation, find the layer that dropped or overrode it and fix that.
+7. Re-read the spec against what the running product actually does. Fix every gap before declaring done.
 
 ## Done when
 
 - The working tree contains an implementation of what `spec/` describes
 - Specified constraints (stack, layout, persistence, out-of-scope items) are respected
+- The running product was exercised with real data, and specified behavior is present in the result, not only in source
