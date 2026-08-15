@@ -4,7 +4,7 @@
 
 - quote: prototype persistence of documents
 - prefix: ss" Browser localStorage for
-- suffix: and chats During local vinex
+- suffix: and comments During local vi
 - created: 2026-08-15T14:59:02.178Z
 - author: Kosta
 - status: open

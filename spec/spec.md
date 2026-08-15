@@ -7,8 +7,9 @@ Build **Specta**, a single-page, Notion-inspired knowledge workspace that combin
 1. A collapsible document library on the left.
 2. A distraction-free rich-text document editor in the center.
 3. Selection-based comments on the document, shown in a panel that opens beside the editor.
+4. A local-dev review mode that diffs `spec/` against git and can commit that folder.
 
-The product should feel calm, editorial, and highly focused. It is a working front-end prototype: documents and comments are stored locally in the browser. During local development, saving the `spec` document also writes `spec/spec.md` and its comment sidecar on disk.
+The product should feel calm, editorial, and highly focused. It is a working front-end prototype: documents and comments are stored locally in the browser. During local development, saving the `spec` document also writes `spec/spec.md` and its comment sidecar on disk. From the editor, the user can review those local `spec/` changes and commit them.
 
 The finished page title is **“Specta — Think, write, and work together”** and the product description is **“A focused knowledge workspace for documents and AI conversations.”**
 
@@ -24,7 +25,12 @@ Use the following stack:
 - Lucide React for interface icons
 - Plain global CSS, optionally loaded through Tailwind CSS using `@import "tailwindcss"`
 - Browser `localStorage` for prototype persistence of documents and comments
-- During local `vinext dev`, saving the `spec` document also writes `spec/spec.md` and `spec/spec.comments.md` on disk
+- During local `vinext dev`, the Vite host also serves:
+    
+    - `POST /api/spec` — write `spec/spec.md` and `spec/spec.comments.md`
+    - `GET /api/spec-sources` — list current `spec/` files and their markdown
+    - `GET /api/spec-review` — diff `spec/` against git
+    - `POST /api/spec-commit` — commit the `spec/` folder
 
 Do not use an external database, authentication system, or live AI API in this version.
 
@@ -35,6 +41,8 @@ The Node.js engine must support version 22.13 or newer.
 Implement the experience as one client-rendered page.
 
 `app/layout.tsx` should provide page metadata, Open Graph metadata, X/Twitter card metadata, and the shared global stylesheet. Build the absolute `og.png` URL from the incoming request host and forwarded protocol.
+
+Icon-only and unlabeled controls need accurate `aria-label`s that match their visible purpose (`Documents`, `Document title`, `Document content`, filenames, overflow menus, the library resize handle, comments, and review actions). Collapsed document buttons also expose the title with the native `title` attribute.
 
 ## 4. Product Layout
 
@@ -216,10 +224,12 @@ Choosing `Delete` from the overflow menu:
 
 At the top of the canvas, show one small inline metadata row, not a bar:
 
-- Left: file icon plus `Working document` in orange.
-- Right: a comments toggle, then `Saving…` while edits are settling, then a green check and `Saved`.
+- Left: file icon plus `Working document` in orange (or `Reviewing spec` while review is open), then a `Review` button (or `Commit` and `Cancel` while reviewing), then `Saving…` while edits are settling, then a green check and `Saved`.
+- Right: a comments toggle. Hide this control while review is open.
 
 The comments toggle uses a message-square icon. If the active document has no threads, its label is `Comments`. If it has threads, show the count instead of the word. The control is pressed while the comments panel is open. Closing the panel while a draft is open cancels that draft.
+
+The `Review` button is available on every document, not only `spec`. While a review or commit request is in flight, disable the review actions and show `Reviewing…` or `Committing…` on the primary button.
 
 Below the metadata row, show a borderless title input. The title must update the active document as the user types.
 
@@ -239,7 +249,7 @@ On each editor update:
 
 Keep the current active document ID in a ref so Tiptap’s update callback never writes into a previously active document because of a stale closure.
 
-When the active document changes, use `editor.commands.setContent(document.content, { emitUpdate: false })` if the editor HTML differs. This prevents the document-switch operation from being mistaken for a user edit. Do not replace editor content while a comment draft is open.
+When the active document changes, use `editor.commands.setContent(document.content, { emitUpdate: false })` if the editor HTML differs. This prevents the document-switch operation from being mistaken for a user edit. Do not replace editor content while a comment draft is open. While review is open, show the review HTML instead of the live document and do not write that HTML back into the document record.
 
 After loading a document, re-attach any missing comment marks by searching the document text for each thread’s quote, using the stored prefix and suffix to pick the best match.
 
@@ -273,6 +283,47 @@ Use corresponding Lucide icons and reflect each formatting command’s active st
 - H2: approximately 23 px.
 - Block quotes use a 3 px orange left border, italic text, and slightly larger type.
 
+### 9.5 Spec review
+
+Review is a local-dev convenience for the `spec/` folder. It is not hosted version control.
+
+Entering review:
+
+1. Ignore the click if a review is already open or a review/commit request is in flight.
+2. Cancel any open comment draft, clear the selected thread, and close the comments panel.
+3. Flush any pending `POST /api/spec` so the files on disk match the editor.
+4. `GET /api/spec-review`. On success, enter review mode with that payload. On failure, stay in the normal editor.
+
+While review is open:
+
+- Change the metadata label to `Reviewing spec`.
+- Make the title and editor read-only. Hide the bubble menu, comments toggle, and comments panel.
+- Do not treat in-document markdown links or comment marks as clickable navigation.
+- Do not `POST /api/spec`.
+
+The review payload is the set of allowed files in `spec/` (`.md`, `.mdx`, `.txt`, including comment sidecars) compared with the same paths on git. Prefer branch `main` if it exists, else `origin/main`, else the current HEAD. Each file has a status of `added`, `deleted`, `modified`, or `unchanged`. Sort `spec.md` first.
+
+If the open document’s filename matches a changed review file, render that file’s diff in the editor as document HTML with inline insertions and deletions. Leave unchanged open documents on their live content.
+
+If no file in `spec/` differs from the comparison branch, show:
+
+> No local changes in spec/ compared with {branch}.
+
+Stay on the document that was open when Review was clicked. Do not switch to `spec.md` or inline another library document’s full diff under the current file.
+
+Other changed library files appear below as a compact `Other changes` list, each labeled `{filename} · {status}`. Choosing one opens that document while staying in review, so its diff replaces the editor. Comment sidecars and deleted files that cannot be opened as documents still render their insertion/deletion HTML below the list. The extra-files region has `aria-label="Spec review"`.
+
+`Cancel` (`aria-label="Cancel review"`) leaves review without committing and restores the live document content.
+
+`Commit` (`aria-label="Commit spec changes"`) `POST`s `/api/spec-commit`. The Vite host:
+
+- If the comparison branch is `main` and HEAD is not `main`, checks out `main` first.
+- Stages `spec/`.
+- If nothing in `spec/` is staged, succeeds without creating a commit.
+- Otherwise creates a commit with message `Update spec`.
+
+On a successful response, reload spec-sourced documents from the current `spec/` files (keep user-created documents that are not in `spec/`), then exit review. Failures stay in review and show the error.
+
 ## 10. Comments
 
 Comments are a document-scoped review surface, not a chat or agent window.
@@ -286,7 +337,7 @@ Switching documents clears the open draft and the selected thread.
 ### 10.2 Panel chrome
 
 - Light warm paper, not the dark agent treatment.
-- Header label `Comments`, with ` · {count}` when there are threads.
+- Header label `Comments`, with `· {count}` when there are threads.
 - Close button with `aria-label="Close comments"`.
 - The panel itself has `aria-label="Comments"`.
 
@@ -388,36 +439,20 @@ Persistence behavior:
 
 Local `spec.md` write-back (development only):
 
-- After that same save debounce, if the changed document id is `spec` and no comment draft is open, `POST /api/spec` with `{ title, content, comments }`.
+- After that same save debounce, if the changed document id is `spec`, no comment draft is open, and review is not open, `POST /api/spec` with `{ title, content, comments }`.
 - Convert the document’s Tiptap HTML back to markdown, keep the title as the first H1, and write `spec/spec.md`.
 - Write `comments` to `spec/spec.comments.md`. If there are no threads (empty sidecar or heading-only file), delete `spec/spec.comments.md` instead of leaving an empty file.
 - Handle the write on the Vite dev host, not inside the Cloudflare worker. The worker filesystem is not the project directory.
 - Untitled documents and any other library items stay in `localStorage` only. Their comments stay in `localStorage` only.
 - Renaming the `spec` document’s displayed filename does not change the write path. Disk write-back is keyed by document id `spec` and always targets `spec/spec.md` and `spec/spec.comments.md`.
-- Do not POST while a comment draft is open. Wait until the draft is submitted or cancelled so an in-progress mark is not flushed.
+- Do not POST while a comment draft is open or while review is open. Wait until the draft is submitted or cancelled so an in-progress mark is not flushed. Flush a pending write before entering review.
+- `GET /api/spec-sources` is the live listing used to pick up new `spec/` files without a full reload and to refresh spec-sourced documents after a commit.
+- Review and commit run only on the Vite dev host, like `POST /api/spec`.
 - This write-back is a local-dev convenience. It is not hosted multi-user storage.
 
-The selected document, selected comment, comments-panel open state, comment draft, search text, collapsed state, and library width do not need to persist across reloads.
+The selected document, selected comment, comments-panel open state, comment draft, review mode, search text, collapsed state, and library width do not need to persist across reloads.
 
-## 12. Accessibility
-
-The remake must include:
-
-- `aria-label="Documents"` for document navigation.
-- `aria-label="Document title"` for the title input.
-- `aria-label="Document content"` on the Tiptap editable surface.
-- `aria-label="Filename for {title}"` for the sidebar filename input.
-- `aria-label="Actions for {title}"` for the document overflow button.
-- `aria-label="Resize document library"` for the library resize handle.
-- `aria-label="Comments"` on the comments panel.
-- `aria-label="Close comments"` on the panel close button.
-- `aria-label="Comments"` or `aria-label="Comments, {count}"` on the metadata toggle.
-- `aria-label="Comment"` on the bubble-menu comment action.
-- `aria-label="Write a comment…"` and `aria-label="Reply…"` on the composers.
-- `aria-label="Delete comment"` and `aria-label="Delete reply"` on delete controls.
-- A native tooltip through `title` for collapsed document buttons.
-
-## 13. Metadata and Social Preview
+## 12. Metadata and Social Preview
 
 Use this metadata:
 
@@ -443,7 +478,7 @@ If recreating the asset rather than reusing it, preserve the exact displayed tex
 Do not accidentally imply that the following are implemented:
 
 - A chat window, LLM, or agent backend.
-- Hosted or multi-user document storage, an external database, or cloud file sync.
+- Hosted or multi-user document storage, an external database, cloud file sync, or remote git. Spec review and commit operate on the local repository through the Vite dev host.
 - Multi-user collaboration or live presence. Comments are local to this browser, authored as `Kosta`.
 - Authentication or workspace membership.
 - Sharing permissions.
@@ -452,18 +487,16 @@ Do not accidentally imply that the following are implemented:
 - Streaming responses.
 - Attachments or file uploads.
 
-The current app is a polished front-end prototype. Documents and comments persist in `localStorage`. During local development, saving the `spec` document also updates `spec/spec.md` and `spec/spec.comments.md` on disk.
+The current app is a polished front-end prototype. Documents and comments persist in `localStorage`. During local development, saving the `spec` document also updates `spec/spec.md` and `spec/spec.comments.md` on disk, and Review / Commit can snapshot and commit the `spec/` folder.
 
 ## 15. Build and Runtime Requirements
 
 Required package scripts should provide development, production build, and start commands through Vinext. The project must retain a Vite configuration using:
 
-- `specWrite()` so `POST /api/spec` writes `spec/spec.md` and `spec/spec.comments.md` from the Vite host during `vinext dev`
+- `specWrite()` so the Vite host during `vinext dev` can write `spec/spec.md` and `spec/spec.comments.md` (`POST /api/spec`), list `spec/` (`GET /api/spec-sources`), diff `spec/` against git (`GET /api/spec-review`), and commit `spec/` (`POST /api/spec-commit`)
 - `vinext()`
 - the Sites Vite plugin
 - the Cloudflare Vite plugin
 - Node.js compatibility flags
-
-No D1 or R2 resources are required for this prototype; both bindings may remain `null` in `.openai/hosting.json`.
 
 The final production build must succeed without TypeScript or bundling errors.

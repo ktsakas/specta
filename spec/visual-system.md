@@ -24,6 +24,8 @@ Additional important colors:
 - Bubble menu charcoal: `#252722`
 - Saved-state green: around `#68806a`
 - Comment highlight: a light orange wash with an orange underline
+- Review insertions: a light green wash, no underline
+- Review deletions: a light reddish wash with a strike-through
 
 ## Typography
 
