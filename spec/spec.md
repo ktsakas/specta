@@ -4,14 +4,14 @@
 
 Build **Specta**, a single-page, Notion-inspired knowledge workspace that combines:
 
-1. A collapsible document library on the left, with a read-only variants view of files in `variants/`.
+1. A collapsible document library on the left, with read-only views of files in `writing-rules/` and `variants/`.
 2. A distraction-free rich-text document editor in the center.
 3. Selection-based comments on the document, shown in a panel that opens beside the editor.
 4. A local-dev review mode that diffs `spec/` against git and can commit that folder.
 
 The product should feel calm, editorial, and highly focused. It is a working front-end prototype: documents and comments are stored locally in the browser. During local development, saving the `spec` document also writes `spec/spec.md` and its comment sidecar on disk. From the editor, the user can review those local `spec/` changes and commit them.
 
-The finished page title is **“Specta — Think, write, and work together”** and the product description is **“A focused knowledge workspace for documents and AI conversations.”**
+The finished page title is **“Specta — Think, write, and work together”** and the product description is **“A focused knowledge workspace for documents and AI conversations.”** That description is metadata only. This version has no chat window, LLM, or agent.
 
 ## 2. Required Technology
 
@@ -32,6 +32,7 @@ Use the following stack:
     - `GET /api/spec-review` — diff `spec/` against git
     - `POST /api/spec-commit` — commit the `spec/` folder
     - `GET /api/variant-sources` — list current `variants/` markdown files (recursive, including subdirectories) and their markdown
+    - `GET /api/writing-rule-sources` — list current `writing-rules/` markdown files (recursive, including subdirectories) and their markdown
 
 Do not use an external database, authentication system, or live AI API in this version.
 
@@ -43,7 +44,7 @@ Implement the experience as one client-rendered page.
 
 `app/layout.tsx` should provide page metadata, Open Graph metadata, X/Twitter card metadata, and the shared global stylesheet. Build the absolute `og.png` URL from the incoming request host and forwarded protocol.
 
-Icon-only and unlabeled controls need accurate `aria-label`s that match their visible purpose (`Documents`, `Variants`, `Document title`, `Document content`, filenames, overflow menus, the library resize handle, comments, and review actions). Collapsed document buttons also expose the title with the native `title` attribute.
+Icon-only and unlabeled controls need accurate `aria-label`s that match their visible purpose (`Documents`, `Writing rules`, `Variants`, `Document title`, `Document content`, filenames, overflow menus, the library resize handle, comments, and review actions). Collapsed document buttons also expose the title with the native `title` attribute.
 
 ## 4. Product Layout
 
@@ -97,17 +98,17 @@ At widths up to 1080 px:
 
 At widths up to 820 px:
 
-- Force the document rail to the compact 64 px presentation even if the explicit collapsed state is false.
+- Force the document rail to the compact 64 px presentation even if the explicit collapsed state is false. Section 4.3 replaces that 64 px rail with 54 px at widths up to 680 px.
 - Hide the resize handle.
-- Show only document icons in the left rail.
 - Hide the brand word, library heading, search, new-document button, document labels, filenames, overflow menu, and profile.
+- Document rows are icon-only. Keep the Writing rules and Variants icon buttons at the top of the rail.
 - Keep the center at least 360 px.
 
 ### 4.3 Mobile
 
 At widths up to 680 px:
 
-- Use a two-column layout: 54 px document rail plus the main content column.
+- Use a two-column layout: 54 px document rail plus the main content column. This 54 px rail replaces the 64 px compact rail from section 4.2.
 - Keep the document rail sticky and viewport-height.
 - When comments are open, stack the editor and comments vertically in the second grid column.
 - Give the comments panel a top border instead of a left border, and cap its height at about half the viewport.
@@ -171,6 +172,22 @@ Each variant record:
 
 When a new allowed file appears under `variants/`, add it to the variants list without requiring a full reload. Variants are not written to `localStorage`.
 
+### 7.4 Writing rules
+
+The writing-rules view is sourced from markdown files in the `writing-rules/` folder, including subdirectories. Do not list those files as library documents. Do not seed comments from them.
+
+On first load, or whenever stored writing rules are missing, read the bundled `writing-rules/` sources. If other `.md`, `.mdx`, or `.txt` files are present under `writing-rules/` (any depth), list them as well.
+
+Each writing-rule record:
+
+- ID is `writing-rule:{relative-path}` (`writing-rule:inconsistencies.md`)
+- Filename is the path relative to `writing-rules/` (`inconsistencies.md`)
+- Title from the file’s first H1, or the file stem if none
+- Updated label: `Just now`
+- Content is the markdown converted to Tiptap HTML
+
+When a new allowed file appears under `writing-rules/`, add it to the writing-rules list without requiring a full reload. Writing rules are not written to `localStorage`.
+
 ## 8. Left Document Sidebar
 
 The left side is always the document library.
@@ -194,7 +211,7 @@ Show:
 - Small plus icon for document creation.
 - Search field with a search icon and placeholder `Search documents`.
 - Full-width orange `New document` button.
-- A `Variants` button above the `All documents` section.
+- A `Writing rules` button above a `Variants` button, both above the `All documents` section.
 - Small `All documents` section label with a chevron.
 - Scrollable document list.
 - Profile row at the bottom with initials `KL`, name `Kosta`, and subtitle `Personal workspace`.
@@ -208,7 +225,7 @@ Show:
 - Active item uses a white background and a 2 px orange inset rule on the left.
 - Clicking the title row changes the active document and loads its stored Tiptap HTML.
 - Editing the filename updates that document’s filename on blur or Enter. It does not change the document title.
-- When collapsed, show only centered document-icon buttons and expose the title with the native `title` attribute.
+- When collapsed, document rows are centered icon-only buttons and expose the title with the native `title` attribute. The Writing rules and Variants icon buttons stay at the top of the rail.
 
 ### 8.4 Creating a document
 
@@ -233,7 +250,7 @@ Choosing `Delete` from the overflow menu:
 
 ### 8.6 Variants view
 
-Above the `All documents` section label, show a `Variants` button (`aria-label="Variants"`). Choosing it replaces the document list with a read-only list of files from `variants/`. A `Documents` button in the same place (`aria-label="Documents"`) returns to the document library.
+Above the `All documents` section label, show a `Writing rules` button (`aria-label="Writing rules"`) stacked above a `Variants` button (`aria-label="Variants"`). Choosing `Variants` replaces the document list with a read-only list of files from `variants/`. A `Documents` button in the Variants slot (`aria-label="Documents"`) returns to the document library. The Writing rules button stays available and switches to that view.
 
 While the variants view is open:
 
@@ -245,9 +262,27 @@ While the variants view is open:
 - Each item uses the same tile treatment as documents. Show the title and the relative path under it. The path is not editable. There is no overflow menu and no delete action.
 - Clicking a row opens that variant in the center editor as read-only.
 - If the list is empty, show an empty list. The editor shows: `No variant files in variants/.`
-- When collapsed or at compact widths, show a `Variants` icon button at the top of the rail to enter the view, and a `Documents` icon button to leave it. Variant items are icon-only like documents.
+- When collapsed or at compact widths, show a `Writing rules` icon button above a `Variants` icon button at the top of the rail. While this view is open, the Variants control becomes a `Documents` icon button to leave it. Variant items are icon-only like documents.
 - Leaving variants restores the document that was active before the view was opened.
 - Entering variants closes comments, cancels a draft, and exits review. Select the first variant, or keep the last selected variant if it is still present.
+
+### 8.7 Writing rules view
+
+The `Writing rules` button sits above the `Variants` button. Choosing it replaces the document list with a read-only list of files from `writing-rules/`. A `Documents` button in the Writing rules slot (`aria-label="Documents"`) returns to the document library. The Variants button stays available and switches to that view.
+
+While the writing-rules view is open:
+
+- Change the library heading to `Writing rules`.
+- Hide the plus control and the `New document` button.
+- Change the search placeholder to `Search writing rules`.
+- Change the section label to `All writing rules`.
+- List every writing rule. Filter titles and relative paths case-insensitively from the search input.
+- Each item uses the same tile treatment as documents. Show the title and the relative path under it. The path is not editable. There is no overflow menu and no delete action.
+- Clicking a row opens that writing rule in the center editor as read-only.
+- If the list is empty, show an empty list. The editor shows: `No writing rule files in writing-rules/.`
+- When collapsed or at compact widths, show a `Writing rules` icon button above a `Variants` icon button at the top of the rail. While this view is open, the Writing rules control becomes a `Documents` icon button to leave it. Writing-rule items are icon-only like documents.
+- Leaving writing rules restores the document that was active before the view was opened.
+- Entering writing rules closes comments, cancels a draft, and exits review. Select the first writing rule, or keep the last selected writing rule if it is still present.
 
 ## 9. Center Document Editor
 
@@ -260,8 +295,8 @@ While the variants view is open:
 
 At the top of the canvas, show one small inline metadata row, not a bar:
 
-- Left: file icon plus `Working document` in orange (or `Reviewing spec` while review is open, or `Variant` while a variant is open), then a `Review` button (or `Commit` and `Cancel` while reviewing), then `Saving…` while edits are settling, then a green check and `Saved`. Hide Review and the save indicator while a variant is open.
-- Right: a comments toggle. Hide this control while review is open or a variant is open.
+- Left: file icon plus `Working document` in orange (or `Reviewing spec` while review is open, or `Variant` while a variant is open, or `Writing rule` while a writing rule is open), then a `Review` button (or `Commit` and `Cancel` while reviewing), then `Saving…` while edits are settling, then a green check and `Saved`. Hide Review and the save indicator while a variant or writing rule is open.
+- Right: a comments toggle. Hide this control while review is open or a variant or writing rule is open.
 
 The comments toggle uses a message-square icon. If the active document has no threads, its label is `Comments`. If it has threads, show the count instead of the word. The control is pressed while the comments panel is open. Closing the panel while a draft is open cancels that draft.
 
@@ -369,6 +404,16 @@ While a variant is open:
 - Do not treat comment marks as clickable.
 - Do not `POST /api/spec`.
 - If the user clicks a link whose last path segment looks like `{stem}.md`, `{stem}.mdx`, or `{stem}.txt`, and a variant with that relative path or stem exists, open that variant.
+
+### 9.7 Writing-rule editor
+
+While a writing rule is open:
+
+- Change the metadata label to `Writing rule`.
+- Make the title and editor read-only. Hide the bubble menu, comments toggle, comments panel, Review, and the save indicator.
+- Do not treat comment marks as clickable.
+- Do not `POST /api/spec`.
+- If the user clicks a link whose last path segment looks like `{stem}.md`, `{stem}.mdx`, or `{stem}.txt`, and a writing rule with that relative path or stem exists, open that writing rule.
 
 ## 10. Comments
 
@@ -494,6 +539,7 @@ Local `spec.md` write-back (development only):
 - Do not POST while a comment draft is open or while review is open. Wait until the draft is submitted or cancelled so an in-progress mark is not flushed. Flush a pending write before entering review.
 - `GET /api/spec-sources` is the live listing used to pick up new `spec/` files without a full reload and to refresh spec-sourced documents after a commit.
 - `GET /api/variant-sources` is the live listing used to pick up new `variants/` files without a full reload. Variants are never written to `localStorage` and never written back to disk from the editor.
+- `GET /api/writing-rule-sources` is the live listing used to pick up new `writing-rules/` files without a full reload. Writing rules are never written to `localStorage` and never written back to disk from the editor.
 - Review and commit run only on the Vite dev host, like `POST /api/spec`.
 - This write-back is a local-dev convenience. It is not hosted multi-user storage.
 
@@ -518,19 +564,20 @@ The project’s `public/og.png` is a landscape editorial social card at approxim
 - Layered document and chat motifs on the right.
 - Burnt-orange accent blocks.
 
-If recreating the asset rather than reusing it, preserve the exact displayed text and the visual palette above.
+If recreating the asset rather than reusing it, preserve the exact displayed text and the visual palette above. The chat motifs are illustration only; do not add a chat window to match them.
 
 ## 14. Intentional Prototype Limitations
 
 Do not accidentally imply that the following are implemented:
 
-- A chat window, LLM, or agent backend.
+- A chat window, LLM, or agent backend. Keep the page description and OG chat motifs from section 12; they are copy and art, not a product surface.
 - Hosted or multi-user document storage, an external database, cloud file sync, or remote git. Spec review and commit operate on the local repository through the Vite dev host.
 - Multi-user collaboration or live presence. Comments are local to this browser, authored as `Kosta`.
 - Authentication or workspace membership.
 - Sharing permissions.
-- Folder hierarchy in the document library. Variant files may live in subdirectories of `variants/`; they still appear as a flat list of relative paths.
+- Folder hierarchy in the document library. Variant files may live in subdirectories of `variants/`; they still appear as a flat list of relative paths. Writing-rule files may live in subdirectories of `writing-rules/`; they still appear as a flat list of relative paths.
 - Editing variant files from the app. The variants view is read-only.
+- Editing writing-rule files from the app. The writing-rules view is read-only.
 - Renaming the document title from the sidebar. The sidebar edits the filename only; the title is edited in the document canvas.
 - Streaming responses.
 - Attachments or file uploads.
@@ -541,7 +588,7 @@ The current app is a polished front-end prototype. Documents and comments persis
 
 Required package scripts should provide development, production build, and start commands through Vinext. The project must retain a Vite configuration using:
 
-- `specWrite()` so the Vite host during `vinext dev` can write `spec/spec.md` and `spec/spec.comments.md` (`POST /api/spec`), list `spec/` (`GET /api/spec-sources`), list `variants/` (`GET /api/variant-sources`), diff `spec/` against git (`GET /api/spec-review`), and commit `spec/` (`POST /api/spec-commit`)
+- `specWrite()` so the Vite host during `vinext dev` can write `spec/spec.md` and `spec/spec.comments.md` (`POST /api/spec`), list `spec/` (`GET /api/spec-sources`), list `variants/` (`GET /api/variant-sources`), list `writing-rules/` (`GET /api/writing-rule-sources`), diff `spec/` against git (`GET /api/spec-review`), and commit `spec/` (`POST /api/spec-commit`)
 - `vinext()`
 - the Sites Vite plugin
 - the Cloudflare Vite plugin

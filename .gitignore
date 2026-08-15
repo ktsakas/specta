@@ -14,6 +14,11 @@
 !/variants/**/
 !/variants/**/*.md
 
+# Allow Markdown writing rules anywhere under writing-rules/.
+!/writing-rules/
+!/writing-rules/**/
+!/writing-rules/**/*.md
+
 # Project skills (Codex + Grok). Claude Code is not mirrored for now.
 !/.agents/
 !/.agents/skills/
