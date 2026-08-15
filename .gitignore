@@ -7,3 +7,8 @@
 # The sole allowed content file.
 !/spec/
 !/spec/spec.md
+
+# Project skills (Codex + Grok). Claude Code is not mirrored for now.
+!/.agents/
+!/.agents/skills/
+!/.agents/skills/**
