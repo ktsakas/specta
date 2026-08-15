@@ -1,4 +1,4 @@
-# Specta Product Reconstruction Specification
+# Specta Product Spec
 
 ## 1. Objective
 
@@ -6,9 +6,9 @@ Build **Specta**, a single-page, Notion-inspired knowledge workspace that combin
 
 1. A collapsible document library on the left.
 2. A distraction-free rich-text document editor in the center.
-3. A document-aware chat/agent window on the right.
+3. Selection-based comments on the document, shown in a panel that opens beside the editor.
 
-The product should feel calm, editorial, and highly focused. It is a working front-end prototype: documents and chats are stored locally in the browser, while the agent response is simulated and intentionally ready to be replaced by a real backend.
+The product should feel calm, editorial, and highly focused. It is a working front-end prototype: documents and comments are stored locally in the browser. During local development, saving the `spec` document also writes `spec/spec.md` and its comment sidecar on disk.
 
 The finished page title is **“Specta — Think, write, and work together”** and the product description is **“A focused knowledge workspace for documents and AI conversations.”**
 
@@ -23,8 +23,8 @@ Use the following stack:
 - Tiptap 3 for the rich-text editor
 - Lucide React for interface icons
 - Plain global CSS, optionally loaded through Tailwind CSS using `@import "tailwindcss"`
-- Browser `localStorage` for prototype persistence of documents and chats
-- During local `vinext dev`, saving the `spec` document also writes `spec/spec.md` on disk
+- Browser `localStorage` for prototype persistence of documents and comments
+- During local `vinext dev`, saving the `spec` document also writes `spec/spec.md` and `spec/spec.comments.md` on disk
 
 Do not use an external database, authentication system, or live AI API in this version.
 
@@ -40,35 +40,37 @@ Implement the experience as one client-rendered page.
 
 ### 4.1 Desktop
 
-Fill the entire viewport with a three-column CSS grid:
+Fill the entire viewport with a two-column CSS grid:
 
 ```text
-┌──────────────────────┬────────────────────────────────┬────────────────────────────┐
-│ Document library     │ Document editor                │ Specta agent                │
-│ Light warm gray      │ Warm ivory paper              │ Dark charcoal              │
-│ 262 px default       │ Flexible, minimum 470 px       │ 360 px                     │
-│ resizable 180–520    │                                │                            │
-│ 64 px collapsed      │                                │                            │
-└──────────────────────┴────────────────────────────────┴────────────────────────────┘
+┌──────────────────────┬────────────────────────────────┐
+│ Document library     │ Document editor                │
+│ Light warm gray      │ Warm ivory paper              │
+│ 262 px default       │ Flexible, minimum 470 px       │
+│ resizable 180–520    │ Comments panel 300 px when     │
+│ 64 px collapsed      │ open, inside this column       │
+└──────────────────────┴────────────────────────────────┘
 ```
 
 Default grid columns:
 
 ```css
-grid-template-columns: var(--library-width, 262px) minmax(470px, 1fr) 360px;
+grid-template-columns: var(--library-width, 262px) minmax(470px, 1fr);
 ```
 
 Collapsed grid columns:
 
 ```css
-grid-template-columns: 64px minmax(470px, 1fr) 360px;
+grid-template-columns: 64px minmax(470px, 1fr);
 ```
+
+The comments panel is not a permanent third column. It opens inside the editor column at 300 px and is closed by default.
 
 While the library is expanded, the user can resize it:
 
 - Default width is 262 px.
 - Drag a vertical handle on the library’s right edge.
-- Clamp between 180 px and 520 px, and also so the center and agent columns can keep their minimums.
+- Clamp between 180 px and 520 px, and also so the editor column can keep its 470 px minimum.
 - Double-click the handle to reset to 262 px.
 - ArrowLeft and ArrowRight on the handle nudge the width by 16 px.
 - Hide the handle while the library is collapsed.
@@ -82,7 +84,6 @@ At widths up to 1080 px:
 
 - Left panel: the current `--library-width` with a 230 px fallback, or 64 px collapsed.
 - Center: at least 420 px.
-- Right panel: 320 px.
 - Reduce the document canvas side margins.
 
 At widths up to 820 px:
@@ -91,7 +92,7 @@ At widths up to 820 px:
 - Hide the resize handle.
 - Show only document icons in the left rail.
 - Hide the brand word, library heading, search, new-document button, document labels, filenames, overflow menu, and profile.
-- Keep the center at least 360 px and the agent panel at 300 px.
+- Keep the center at least 360 px.
 
 ### 4.3 Mobile
 
@@ -99,94 +100,51 @@ At widths up to 680 px:
 
 - Use a two-column layout: 54 px document rail plus the main content column.
 - Keep the document rail sticky and viewport-height.
-- Stack the editor and chat vertically in the second grid column.
-- Give the editor a minimum height of approximately 520 px.
-- Give the chat a minimum height of approximately 540 px.
+- When comments are open, stack the editor and comments vertically in the second grid column.
+- Give the comments panel a top border instead of a left border, and cap its height at about half the viewport.
 - Allow the page body to scroll.
-- Remove the chat’s left border and replace it with a top border.
 
 ## 5. Visual System
 
-### 5.1 Colors
-
-Define these root variables:
-
-```css
---ink: #282722;
---muted: #77746c;
---line: #e5e2da;
---paper: #fdfcf9;
---soft: #f4f2ec;
---accent: #e96a3b;
---accent-dark: #c64d24;
-```
-
-Additional important colors:
-
-- Page surround: `#e8e6df`
-- Left sidebar: `#f4f2ed`
-- Right chat panel: `#252722`
-- Chat secondary surface: around `#30322d`
-- Dark separators: around `#3a3c36`
-- Saved-state green: around `#68806a`
-
-### 5.2 Typography
-
-- Use IBM Plex Sans, with Arial/Helvetica as fallback, for interface chrome, navigation, labels, buttons, and chat.
-- Use IBM Plex Serif, with Georgia/Times New Roman as fallback, for the document title and document body.
-- The large title is bold, 38–54 px using `clamp`, with tight negative letter spacing.
-- Document body text is approximately 17 px with a 1.72 line-height.
-- Use compact, uppercase, letter-spaced 10 px labels for metadata and section headings.
-
-### 5.3 Shape and finish
-
-- Use restrained rounding: generally 4–8 px, except circular avatars.
-- Use borders and subtle inset/accent rules more often than large cards.
-- Use the orange accent for creation actions, active-document details, and the agent icon.
-- The editor surface is a continuous sheet, not a rounded card.
-- Avoid gradients, excessive shadows, or dashboard-style tiles.
-- Use Lucide icons instead of custom SVG markup.
+Colors, typography, and finish are specified in [Visual System](visual-system.md).
 
 ## 6. Data Model
 
-Documents have an id, title, filename, Tiptap HTML content, and a human-readable updated label. Chats have an id, title, and a list of user or assistant messages.
+Documents have an id, title, filename, Tiptap HTML content, and a human-readable updated label.
+
+Comment threads belong to one document and have an id, the quoted text, short prefix and suffix context around that quote, an ISO created timestamp, an author name, a status of `open` or `orphaned`, a body, and a list of replies. Replies have an id, author, ISO created timestamp, and body.
 
 Filenames are unique among documents and look like `spec.md` or `untitled.md`. They must end in `.md`, `.mdx`, or `.txt`. Sanitize user-entered names: strip slashes and illegal characters, and append `.md` if there is no allowed extension. If the desired name is already taken, append `-2`, `-3`, and so on.
 
-Generate new IDs from a prefix, current timestamp, and short random base-36 suffix.
+Generate new IDs from a prefix, current timestamp, and short random base-36 suffix. New comment threads use the `cmt` prefix. New replies use the `cmt-r` prefix.
+
+Comment sidecar filenames look like `spec.comments.md`. A file matching `*.comments.md`, `*.comments.mdx`, or `*.comments.txt` is a comment sidecar, not a library document.
 
 ## 7. Seed Content
 
 ### 7.1 Documents
 
-The document library is sourced from files in the `spec/` folder. Do not seed fictional stand-ins such as Product brief, Research notes, or Weekly plan.
+The document library is sourced from files in the `spec/` folder. Do not seed fictional stand-ins such as Product brief, Research notes, or Weekly plan. Do not list comment sidecar files as documents.
 
-On first load, or whenever stored documents are missing or unusable, seed the editor with `spec/spec.md`:
+On first load, or whenever stored documents are missing or unusable, seed the editor from `spec/`:
 
 - ID derived from the filename stem (`spec`)
 - Filename is the source file’s name (`spec.md`)
-- Title from the file’s first H1 (`Specta Product Reconstruction Specification`), or `spec` if none
+- Title from the file’s first H1 (`Specta Product Spec`), or the stem if none
 - Updated label: `Just now`
-- Content is the markdown of `spec/spec.md` converted to Tiptap HTML
+- Content is the markdown converted to Tiptap HTML
 
-If other `.md`, `.mdx`, or `.txt` files are present in `spec/`, list them as additional documents. `spec.md` is the default active document.
+If other `.md`, `.mdx`, or `.txt` files are present in `spec/` and they are not comment sidecars, list them as additional documents. `spec.md` is the default active document.
 
-### 7.2 Chat sessions
+When stored documents are usable, still replace any record whose id matches a `spec/` source file with that source file’s current content, and keep user-created documents that are not in `spec/`.
 
-Seed three sessions:
+When a new allowed file appears in `spec/`, add it to the library without requiring a full reload.
 
-- `Launch positioning`
-- `Interview synthesis`
-- `Q3 roadmap ideas`
+### 7.2 Comments
 
-The initial assistant message should say:
+Seed comments from comment sidecar files in `spec/`. `spec.comments.md` is the sidecar for the `spec` document. Parse its threads and attach them to document id `spec`. If other sidecars exist, attach them to the document whose id is the sidecar stem (`visual-system.comments.md` → `visual-system`).
 
-> I’m ready to help with this document. Ask me to summarize it, challenge an idea, or draft the next section.
-
-The launch-positioning session should also contain this exchange:
-
-- User: `What feels strongest in this brief?`
-- Assistant: `The clearest idea is the bridge between conversation and documentation. I’d make that the center of the positioning.`
+The prototype author name is `Kosta`.
 
 ## 8. Left Document Sidebar
 
@@ -243,6 +201,7 @@ Both plus controls call the same creation function. A new document must:
 Choosing `Delete` from the overflow menu:
 
 - Removes that document from the array.
+- Removes that document’s comments.
 - If it was the active document, select `spec` if it is still present, otherwise the first remaining document.
 - If the library would be empty, create one blank Untitled document and select it.
 
@@ -258,13 +217,17 @@ Choosing `Delete` from the overflow menu:
 At the top of the canvas, show one small inline metadata row, not a bar:
 
 - Left: file icon plus `Working document` in orange.
-- Right: `Saving…` while edits are settling, then a green check and `Saved`.
+- Right: a comments toggle, then `Saving…` while edits are settling, then a green check and `Saved`.
 
-Below it, show a borderless title input. The title must update the active document as the user types.
+The comments toggle uses a message-square icon. If the active document has no threads, its label is `Comments`. If it has threads, show the count instead of the word. The control is pressed while the comments panel is open. Closing the panel while a draft is open cancels that draft.
+
+Below the metadata row, show a borderless title input. The title must update the active document as the user types.
 
 ### 9.2 Tiptap setup
 
 Use the placeholder `Start writing…`. Set the editable element class to `tiptap-editor` and give it `aria-label="Document content"`.
+
+Include a comment mark that wraps highlighted ranges in `span[data-comment-id]` with class `comment-mark`. Convert those marks back to plain text when writing markdown; comments live in the sidecar, not inline in the document file.
 
 On each editor update:
 
@@ -272,10 +235,17 @@ On each editor update:
 2. Replace the active document’s `content`.
 3. Set `updatedAt` to `Just now`.
 4. Set the save indicator to unsaved.
+5. Refresh each thread’s quote/prefix/suffix from its current mark, or mark the thread `orphaned` if the range is gone.
 
 Keep the current active document ID in a ref so Tiptap’s update callback never writes into a previously active document because of a stale closure.
 
-When the active document changes, use `editor.commands.setContent(document.content, { emitUpdate: false })` if the editor HTML differs. This prevents the document-switch operation from being mistaken for a user edit.
+When the active document changes, use `editor.commands.setContent(document.content, { emitUpdate: false })` if the editor HTML differs. This prevents the document-switch operation from being mistaken for a user edit. Do not replace editor content while a comment draft is open.
+
+After loading a document, re-attach any missing comment marks by searching the document text for each thread’s quote, using the stored prefix and suffix to pick the best match.
+
+Clicking a comment mark opens the comments panel and selects that thread. Selecting a thread also scrolls its highlight into view.
+
+If the user clicks a link whose last path segment looks like `{stem}.md`, `{stem}.mdx`, or `{stem}.txt`, and a library document with that id exists, open that document instead of navigating away. This is how `spec.md` links such as [Visual System](visual-system.md) switch documents.
 
 ### 9.3 Selection-based formatting
 
@@ -293,8 +263,9 @@ Include these commands:
 - Bullet list
 - Numbered list
 - Block quote
+- Comment
 
-Use corresponding Lucide icons and reflect each command’s active state.
+Use corresponding Lucide icons and reflect each formatting command’s active state. The Comment action starts a new comment from the current selection.
 
 ### 9.4 Editor typography
 
@@ -302,76 +273,91 @@ Use corresponding Lucide icons and reflect each command’s active state.
 - H2: approximately 23 px.
 - Block quotes use a 3 px orange left border, italic text, and slightly larger type.
 
-## 10. Right Agent Chat
+## 10. Comments
 
-The right side must be a dedicated conversation/agent window. Do not use it as a document list.
+Comments are a document-scoped review surface, not a chat or agent window.
 
-### 10.1 Header
+### 10.1 Opening the panel
 
-- Dark charcoal background.
-- Circular agent mark using the `Sparkles` icon in orange.
-- Label: `Specta agent`.
-- Subtitle: `Uses this document`.
-- A plus button on the right starts a new chat and has accessible text/title `New chat` or `Start a new chat`.
+The panel is closed by default. Open it from the metadata comments toggle, from the bubble-menu Comment action, or by clicking an existing highlight. Closing it from the panel’s close button, the toggle, or by clearing the active comment hides the panel.
 
-### 10.2 Session selection
+Switching documents clears the open draft and the selected thread.
 
-- Directly below the header, show a compact dark select control.
-- Populate it with all chat session titles.
-- Selecting an option changes the visible session.
-- Overlay a small `ChevronDown` icon at the right while retaining a native accessible `<select>`.
+### 10.2 Panel chrome
 
-### 10.3 Messages
+- Light warm paper, not the dark agent treatment.
+- Header label `Comments`, with ` · {count}` when there are threads.
+- Close button with `aria-label="Close comments"`.
+- The panel itself has `aria-label="Comments"`.
 
-- The message history is the only flexible scrolling area in this panel.
-- Assistant messages align left and include a small circular `Bot` avatar.
-- User messages align right in a modest charcoal bubble.
-- Do not place assistant responses inside large cards.
-- Give the message list `aria-live="polite"`.
+### 10.3 Starting a comment
 
-### 10.4 Prompt shortcuts
+The bubble-menu Comment action, when the selection is non-empty and has text:
 
-Above the composer, render two small outlined buttons:
+1. Capture the selected quote plus about 32 characters of prefix and suffix.
+2. Generate a thread id.
+3. Apply the comment mark to the selection immediately.
+4. Open the panel with a draft composer.
 
-- `Summarize`, which fills the composer with `Summarize this document`.
-- `Suggest edits`, which fills the composer with `What should I improve?`.
+Do nothing if the selection is empty or has no text.
 
-The shortcut fills the input but does not automatically submit it.
+The draft composer:
 
-### 10.5 Composer
+- Shows the quoted text.
+- Uses placeholder `Write a comment…`.
+- Submit button label `Comment`.
+- `Cancel` removes the draft mark and closes the draft.
+- Escape cancels.
+- Enter submits. Shift+Enter inserts a newline.
+- Ignore a blank body.
 
-- Use a dark bordered form containing a 3-row textarea.
-- Placeholder: `Ask about this document…`.
-- Enter submits.
-- Shift+Enter creates a newline.
-- Show `Specta can make mistakes` in the lower-left.
-- Show a small orange send button in the lower-right.
-- Disable the send button when the trimmed input is empty.
+On submit, prepend an `open` thread authored by `Kosta` with an empty replies list, keep the mark, and select the new thread.
 
-On submit:
+### 10.4 Thread list
 
-1. Ignore blank input.
-2. Append the user message to the active session.
-3. Append a simulated assistant reply that references the active document title and explains that the prototype is ready for an agent backend.
-4. If the chat was called `New conversation`, rename it to the first 34 characters of the user’s first message.
-5. Clear the textarea.
+Each saved thread shows:
 
-The simulated response pattern may be:
+- The quoted text in serif italics, wrapped in quotation marks.
+- A `Detached` badge and fallback copy `The original text is no longer in this document.` when status is `orphaned`.
+- Author `Kosta`, a relative time (`Just now`, `5m ago`, `3h ago`, or a short date), the body, and a delete control labeled `Delete comment`.
+- Replies indented under the parent, each with the same author/time/body treatment and `Delete reply`.
+- A reply composer with placeholder `Reply…` and submit label `Reply`. Same Enter / Shift+Enter rules as the draft composer.
 
-```text
-I’ll use “{document title}” as context. This prototype has captured your request and is ready to connect to an agent backend.
+The selected thread uses the same 2 px orange inset rule as the active document. Clicking a thread selects it and scrolls to the highlight.
+
+Empty state, when there is no draft and no threads:
+
+> Select text in the document to leave a comment.
+
+Deleting a thread removes its mark from the editor. Deleting the last thread does not force the panel closed.
+
+### 10.5 Sidecar format
+
+Serialize comments as markdown. Example shape:
+
+```markdown
+# Comments for spec.md
+
+## cmt-exampleid
+
+- quote: quoted span
+- prefix: text before
+- suffix: text after
+- created: 2026-08-15T14:59:02.178Z
+- author: Kosta
+- status: open
+
+Comment body.
+
+### cmt-r-exampleid
+
+- created: 2026-08-15T15:01:00.000Z
+- author: Kosta
+
+Reply body.
 ```
 
-### 10.6 Starting a new chat
-
-Create a new record that:
-
-- Has a generated ID.
-- Is titled `New conversation`.
-- Contains a fresh copy of the welcome assistant message with a unique message ID.
-- Is prepended to the chat array.
-- Becomes active immediately.
-- Clears the current composer input.
+Flatten quote/prefix/suffix to a single line. Preserve body text after the metadata block.
 
 ## 11. Client State and Persistence
 
@@ -379,34 +365,39 @@ Use these local-storage keys:
 
 ```text
 specta-documents
-specta-chats
+specta-comments
 ```
+
+`specta-comments` is a map of document id to sidecar markdown, not an array of chat sessions. Do not read or write `specta-chats`.
 
 Hydration behavior:
 
 - Read both values once after the component mounts.
 - Wrap parsing in `try/catch` and retain seed data if parsing fails.
 - Old document records may not contain `filename`; derive one from the id (`{id}.md`, sanitized).
-- Old chat records may not contain `messages`; normalize them to include the welcome message.
+- Start from comment sidecars bundled with `spec/`, then overlay any valid stored markdown for those document ids.
+- If the stored comments value is not a string map, keep the sidecar seed.
 - Do not write the seed state back before hydration completes. Gate persistence behind a `ready` flag.
 
 Persistence behavior:
 
 - Save the full document array whenever it changes after hydration.
-- Save the full chat array whenever it changes after hydration.
-- After a document change, show `Saving…`, then switch to `Saved` after approximately 650 ms.
-- Cancel the previous save-indicator timeout when another document update occurs.
+- Save the comments map whenever documents or threads change after hydration.
+- After a document or comment change, show `Saving…`, then switch to `Saved` after approximately 650 ms.
+- Cancel the previous save-indicator timeout when another update occurs.
 
 Local `spec.md` write-back (development only):
 
-- After that same save debounce, if the changed document id is `spec`, `POST /api/spec` with `{ title, content }`.
+- After that same save debounce, if the changed document id is `spec` and no comment draft is open, `POST /api/spec` with `{ title, content, comments }`.
 - Convert the document’s Tiptap HTML back to markdown, keep the title as the first H1, and write `spec/spec.md`.
+- Write `comments` to `spec/spec.comments.md`. If there are no threads (empty sidecar or heading-only file), delete `spec/spec.comments.md` instead of leaving an empty file.
 - Handle the write on the Vite dev host, not inside the Cloudflare worker. The worker filesystem is not the project directory.
-- Untitled documents and any other library items stay in `localStorage` only.
-- Renaming the `spec` document’s displayed filename does not change the write path. Disk write-back is keyed by document id `spec` and always targets `spec/spec.md`.
+- Untitled documents and any other library items stay in `localStorage` only. Their comments stay in `localStorage` only.
+- Renaming the `spec` document’s displayed filename does not change the write path. Disk write-back is keyed by document id `spec` and always targets `spec/spec.md` and `spec/spec.comments.md`.
+- Do not POST while a comment draft is open. Wait until the draft is submitted or cancelled so an in-progress mark is not flushed.
 - This write-back is a local-dev convenience. It is not hosted multi-user storage.
 
-The selected document, selected chat, search text, composer draft, collapsed state, and library width do not need to persist across reloads.
+The selected document, selected comment, comments-panel open state, comment draft, search text, collapsed state, and library width do not need to persist across reloads.
 
 ## 12. Accessibility
 
@@ -418,8 +409,12 @@ The remake must include:
 - `aria-label="Filename for {title}"` for the sidebar filename input.
 - `aria-label="Actions for {title}"` for the document overflow button.
 - `aria-label="Resize document library"` for the library resize handle.
-- `aria-label="Current chat session"` for session selection.
-- `aria-live="polite"` on the message list.
+- `aria-label="Comments"` on the comments panel.
+- `aria-label="Close comments"` on the panel close button.
+- `aria-label="Comments"` or `aria-label="Comments, {count}"` on the metadata toggle.
+- `aria-label="Comment"` on the bubble-menu comment action.
+- `aria-label="Write a comment…"` and `aria-label="Reply…"` on the composers.
+- `aria-label="Delete comment"` and `aria-label="Delete reply"` on delete controls.
 - A native tooltip through `title` for collapsed document buttons.
 
 ## 13. Metadata and Social Preview
@@ -447,9 +442,9 @@ If recreating the asset rather than reusing it, preserve the exact displayed tex
 
 Do not accidentally imply that the following are implemented:
 
-- A real LLM or agent backend.
+- A chat window, LLM, or agent backend.
 - Hosted or multi-user document storage, an external database, or cloud file sync.
-- Multi-user collaboration.
+- Multi-user collaboration or live presence. Comments are local to this browser, authored as `Kosta`.
 - Authentication or workspace membership.
 - Sharing permissions.
 - Folder hierarchy.
@@ -457,13 +452,13 @@ Do not accidentally imply that the following are implemented:
 - Streaming responses.
 - Attachments or file uploads.
 
-The current app is a polished front-end prototype. Documents and chats persist in `localStorage`. During local development, saving the `spec` document also updates `spec/spec.md` on disk.
+The current app is a polished front-end prototype. Documents and comments persist in `localStorage`. During local development, saving the `spec` document also updates `spec/spec.md` and `spec/spec.comments.md` on disk.
 
 ## 15. Build and Runtime Requirements
 
 Required package scripts should provide development, production build, and start commands through Vinext. The project must retain a Vite configuration using:
 
-- `specWrite()` so `POST /api/spec` writes `spec/spec.md` from the Vite host during `vinext dev`
+- `specWrite()` so `POST /api/spec` writes `spec/spec.md` and `spec/spec.comments.md` from the Vite host during `vinext dev`
 - `vinext()`
 - the Sites Vite plugin
 - the Cloudflare Vite plugin
