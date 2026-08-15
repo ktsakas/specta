@@ -46,7 +46,8 @@ Fill the entire viewport with a three-column CSS grid:
 ┌──────────────────────┬────────────────────────────────┬────────────────────────────┐
 │ Document library     │ Document editor                │ Specta agent                │
 │ Light warm gray      │ Warm ivory paper              │ Dark charcoal              │
-│ 262 px expanded      │ Flexible, minimum 470 px       │ 360 px                     │
+│ 262 px default       │ Flexible, minimum 470 px       │ 360 px                     │
+│ resizable 180–520    │                                │                            │
 │ 64 px collapsed      │                                │                            │
 └──────────────────────┴────────────────────────────────┴────────────────────────────┘
 ```
@@ -54,7 +55,7 @@ Fill the entire viewport with a three-column CSS grid:
 Default grid columns:
 
 ```css
-grid-template-columns: 262px minmax(470px, 1fr) 360px;
+grid-template-columns: var(--library-width, 262px) minmax(470px, 1fr) 360px;
 ```
 
 Collapsed grid columns:
@@ -63,13 +64,23 @@ Collapsed grid columns:
 grid-template-columns: 64px minmax(470px, 1fr) 360px;
 ```
 
-Animate the column-width change over about 180 ms. The page body must not scroll on desktop; each major panel controls its own overflow.
+While the library is expanded, the user can resize it:
+
+- Default width is 262 px.
+- Drag a vertical handle on the library’s right edge.
+- Clamp between 180 px and 520 px, and also so the center and agent columns can keep their minimums.
+- Double-click the handle to reset to 262 px.
+- ArrowLeft and ArrowRight on the handle nudge the width by 16 px.
+- Hide the handle while the library is collapsed.
+- While dragging, do not animate the grid.
+
+Animate other column-width changes over about 180 ms. The page body must not scroll on desktop; each major panel controls its own overflow.
 
 ### 4.2 Medium widths
 
 At widths up to 1080 px:
 
-- Left panel: 230 px expanded or 64 px collapsed.
+- Left panel: the current `--library-width` with a 230 px fallback, or 64 px collapsed.
 - Center: at least 420 px.
 - Right panel: 320 px.
 - Reduce the document canvas side margins.
@@ -77,8 +88,9 @@ At widths up to 1080 px:
 At widths up to 820 px:
 
 - Force the document rail to the compact 64 px presentation even if the explicit collapsed state is false.
+- Hide the resize handle.
 - Show only document icons in the left rail.
-- Hide the brand word, library heading, search, new-document button, document labels, overflow icons, and profile.
+- Hide the brand word, library heading, search, new-document button, document labels, filenames, overflow menu, and profile.
 - Keep the center at least 360 px and the agent panel at 300 px.
 
 ### 4.3 Mobile
@@ -120,8 +132,8 @@ Additional important colors:
 
 ### 5.2 Typography
 
-- Use Arial/Helvetica for interface chrome, navigation, labels, buttons, and chat.
-- Use Georgia/Times New Roman for the document title and document body.
+- Use IBM Plex Sans, with Arial/Helvetica as fallback, for interface chrome, navigation, labels, buttons, and chat.
+- Use IBM Plex Serif, with Georgia/Times New Roman as fallback, for the document title and document body.
 - The large title is bold, 38–54 px using `clamp`, with tight negative letter spacing.
 - Document body text is approximately 17 px with a 1.72 line-height.
 - Use compact, uppercase, letter-spaced 10 px labels for metadata and section headings.
@@ -137,7 +149,9 @@ Additional important colors:
 
 ## 6. Data Model
 
-Documents have an id, title, Tiptap HTML content, and a human-readable updated label. Chats have an id, title, and a list of user or assistant messages.
+Documents have an id, title, filename, Tiptap HTML content, and a human-readable updated label. Chats have an id, title, and a list of user or assistant messages.
+
+Filenames are unique among documents and look like `spec.md` or `untitled.md`. They must end in `.md`, `.mdx`, or `.txt`. Sanitize user-entered names: strip slashes and illegal characters, and append `.md` if there is no allowed extension. If the desired name is already taken, append `-2`, `-3`, and so on.
 
 Generate new IDs from a prefix, current timestamp, and short random base-36 suffix.
 
@@ -149,7 +163,8 @@ The document library is sourced from files in the `spec/` folder. Do not seed fi
 
 On first load, or whenever stored documents are missing or unusable, seed the editor with `spec/spec.md`:
 
-- ID derived from the filename (`spec`)
+- ID derived from the filename stem (`spec`)
+- Filename is the source file’s name (`spec.md`)
 - Title from the file’s first H1 (`Specta Product Reconstruction Specification`), or `spec` if none
 - Updated label: `Just now`
 - Content is the markdown of `spec/spec.md` converted to Tiptap HTML
@@ -202,11 +217,13 @@ Show:
 
 ### 8.3 Document list behavior
 
-- Filter titles case-insensitively from the search input.
+- Filter titles and filenames case-insensitively from the search input.
 - Each item has a hash icon in a small rectangular document tile.
-- Each expanded item shows its title, updated label, and a subtle overflow icon.
+- Each expanded item shows its title, an editable filename under the title, and a subtle overflow icon.
+- The overflow icon opens a small menu whose only action is `Delete`.
 - Active item uses a white background and a 2 px orange inset rule on the left.
-- Clicking an item changes the active document and loads its stored Tiptap HTML.
+- Clicking the title row changes the active document and loads its stored Tiptap HTML.
+- Editing the filename updates that document’s filename on blur or Enter. It does not change the document title.
 - When collapsed, show only centered document-icon buttons and expose the title with the native `title` attribute.
 
 ### 8.4 Creating a document
@@ -215,10 +232,19 @@ Both plus controls call the same creation function. A new document must:
 
 - Have a generated ID.
 - Be titled `Untitled`.
+- Use a unique filename starting from `untitled.md`.
 - Use `Just now` as its updated label.
 - Start with `<p></p>` content.
 - Be prepended to the document array.
 - Become active immediately.
+
+### 8.5 Deleting a document
+
+Choosing `Delete` from the overflow menu:
+
+- Removes that document from the array.
+- If it was the active document, select `spec` if it is still present, otherwise the first remaining document.
+- If the library would be empty, create one blank Untitled document and select it.
 
 ## 9. Center Document Editor
 
@@ -360,6 +386,7 @@ Hydration behavior:
 
 - Read both values once after the component mounts.
 - Wrap parsing in `try/catch` and retain seed data if parsing fails.
+- Old document records may not contain `filename`; derive one from the id (`{id}.md`, sanitized).
 - Old chat records may not contain `messages`; normalize them to include the welcome message.
 - Do not write the seed state back before hydration completes. Gate persistence behind a `ready` flag.
 
@@ -376,9 +403,10 @@ Local `spec.md` write-back (development only):
 - Convert the document’s Tiptap HTML back to markdown, keep the title as the first H1, and write `spec/spec.md`.
 - Handle the write on the Vite dev host, not inside the Cloudflare worker. The worker filesystem is not the project directory.
 - Untitled documents and any other library items stay in `localStorage` only.
+- Renaming the `spec` document’s displayed filename does not change the write path. Disk write-back is keyed by document id `spec` and always targets `spec/spec.md`.
 - This write-back is a local-dev convenience. It is not hosted multi-user storage.
 
-The selected document, selected chat, search text, composer draft, and collapsed state do not need to persist across reloads.
+The selected document, selected chat, search text, composer draft, collapsed state, and library width do not need to persist across reloads.
 
 ## 12. Accessibility
 
@@ -387,6 +415,9 @@ The remake must include:
 - `aria-label="Documents"` for document navigation.
 - `aria-label="Document title"` for the title input.
 - `aria-label="Document content"` on the Tiptap editable surface.
+- `aria-label="Filename for {title}"` for the sidebar filename input.
+- `aria-label="Actions for {title}"` for the document overflow button.
+- `aria-label="Resize document library"` for the library resize handle.
 - `aria-label="Current chat session"` for session selection.
 - `aria-live="polite"` on the message list.
 - A native tooltip through `title` for collapsed document buttons.
@@ -421,7 +452,8 @@ Do not accidentally imply that the following are implemented:
 - Multi-user collaboration.
 - Authentication or workspace membership.
 - Sharing permissions.
-- Document deletion, renaming from the sidebar, or folder hierarchy.
+- Folder hierarchy.
+- Renaming the document title from the sidebar. The sidebar edits the filename only; the title is edited in the document canvas.
 - Streaming responses.
 - Attachments or file uploads.
 
